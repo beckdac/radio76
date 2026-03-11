@@ -25,7 +25,7 @@ class Radio76App(App[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Log(max_lines=10, auto_scroll=True)
+        yield Log(max_lines=24, auto_scroll=True)
         yield Footer()
 
     def on_mount(self) -> None:
@@ -41,7 +41,6 @@ class Radio76App(App[None]):
         global lines
         for line in lines:
             print(line)
-            log_widget.write_line("foo")
             log_widget.write_line(line)
         lines = []
 
@@ -66,7 +65,7 @@ def main() -> None:
     device = 14
     gain = 250
     block_duration_ms = 100
-    columns = 40
+    columns = 100
     high = 3200
     low = 50
     samplerate = sd.query_devices(device, 'input')['default_samplerate']
@@ -87,10 +86,12 @@ def main() -> None:
             magnitude *= gain / fftsize
             line = (gradient[int(np.clip(x, 0, 1) * (len(gradient) - 1))]
                     for x in magnitude[low_bin:low_bin + columns])
+            txt = "".join(line)
             #print(*line, sep='', end='\x1b[0m\n')
-            print(*line, sep='', end='\n')
-            #print(len(list(line)))
-            lines.append("".join(line))
+            #print(*line, sep='', end='\n')
+            #print(f"pre {txt}")
+            lines.append(f"{txt}\n")
+            #lines.append(f"fii {len(list(line))}")
         else:
             print("no input")
 
