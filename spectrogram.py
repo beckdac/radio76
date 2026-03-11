@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python4
 """Show a text-mode spectrogram using live microphone data."""
 import argparse
 import math
@@ -76,6 +76,8 @@ try:
     low_bin = math.floor(low / delta_f)
 
     def callback(indata, frames, time, status):
+        #print(frames)
+        #print(len(indata[:,0]))
         if status:
             text = ' ' + str(status) + ' '
             print('\x1b[34;40m', text.center(args.columns, '#'),
