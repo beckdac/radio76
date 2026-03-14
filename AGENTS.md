@@ -1,4 +1,5 @@
 This is a Python code base for controling an HF radio using Python's Hamlib bindings found here: https://github.com/Hamlib/Hamlib/blob/master/bindings/README.python
+This code base follows the src layout. The package is named `radio76` and is found in `src` and the tests are in `tests`.
 
 The user interface is provided by the textual package.
 
