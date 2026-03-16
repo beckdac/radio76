@@ -1,6 +1,8 @@
 import asyncio
-import sounddevice as sd
+import math
+
 import numpy as np
+import sounddevice as sd
 
 # Audio Settings
 SAMPLERATE = 48000
@@ -27,20 +29,53 @@ class AudioProtocol(asyncio.DatagramProtocol):
             queue_full += 1
             pass # Drop packet if queue is too full
 
+
+
+colors = 30, 34, 35, 91, 93, 97
+chars = ' :%#\t#%:'
+gradient = []
+for bg, fg in zip(colors, colors[1:]):
+    for char in chars:
+        if char == '\t':
+            bg, fg = fg, bg
+        else:
+            gradient.append(f'\x1b[{fg};{bg + 10}m{char}')
+
+
+
 async def audio_player():
     """Consumes data from queue and plays it."""
+    high = 3000
+    low = 50
+    columns = 120
+    samplerate = 48000
+    gain = .1
+    delta_f = (high - low) / (columns - 1)
+    fftsize = math.ceil(samplerate / delta_f)
+    low_bin = math.floor(low / delta_f)
+
     # Start sounddevice output stream
     with sd.RawOutputStream(samplerate=SAMPLERATE, channels=CHANNELS, 
                              dtype=DTYPE, blocksize=BLOCKSIZE) as stream:
         while True:
-            if received_packets % 100 == 0:
-                print(f"received {received_packets} with {queue_full} queue overruns")
+            #if received_packets % 100 == 0:
+            #    print(f"received {received_packets} with {queue_full} queue overruns")
             # Wait for data from UDP server
             data = await audio_queue.get()
-            
+            audio_data = np.frombuffer(data, dtype=np.int16).reshape(-1, 1)
+
+            magnitude = np.abs(np.fft.rfft(audio_data[:, 0], n=fftsize))
+            magnitude *= gain / fftsize
+            line = (gradient[int(np.clip(x, 0, 1) * (len(gradient) - 1))]
+                    for x in magnitude[low_bin:low_bin + columns])
+            print(*line, sep='', end='\x1b[0m\n')
+
             # Write data to output stream
             stream.write(data)
             audio_queue.task_done()
+
+
+
 
 async def main_loop():
     # Get the local event loop
