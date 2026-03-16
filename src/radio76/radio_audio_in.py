@@ -28,6 +28,7 @@ async def inputstream_generator(channels=1, **kwargs):
 
     stream = sd.RawInputStream(callback=callback, channels=channels, **kwargs)
     sent_packets = 0
+    start_time = time.perf_counter()
     with stream:
         while True:
             audio_data, status = await q_in.get()
@@ -36,7 +37,10 @@ async def inputstream_generator(channels=1, **kwargs):
             sent_packets += 1
             sock.sendto(audio_data, (UDP_IP, UDP_PORT))
             if sent_packets % PACKET_UPDATE == 0:
-                print(f"sent {sent_packets} packets")
+                last_time = time.perf_counter()
+                execution_time = last_time - start_time
+                start_time = last_time
+                print(f"sent {sent_packets} packets in {execution_time:.6f} seconds")
             q_in.task_done()
             #yield indata, status
 
