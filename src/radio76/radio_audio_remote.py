@@ -12,14 +12,19 @@ UDP_PORT = 5005
 # Queue to bridge UDP receiving and audio playback
 audio_queue = asyncio.Queue(maxsize=10)
 
+received_packets = 0
+queue_full = 0
+
 class AudioProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
         # Put audio data into queue without blocking
-        print(".", end="")
+        global received_packets
+        global queue_full
         try:
+            received_packets += 1
             audio_queue.put_nowait(data)
         except asyncio.QueueFull:
-            print("dropped packet because of full queue")
+            queue_full += 1
             pass # Drop packet if queue is too full
 
 async def audio_player():
@@ -28,6 +33,8 @@ async def audio_player():
     with sd.RawOutputStream(samplerate=SAMPLERATE, channels=CHANNELS, 
                              dtype=DTYPE, blocksize=BLOCKSIZE) as stream:
         while True:
+            if received_packets % 100 == 0:
+                print(f"received {received_packets} with {queue_full} queue overruns")
             # Wait for data from UDP server
             data = await audio_queue.get()
             
