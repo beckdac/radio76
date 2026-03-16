@@ -15,3 +15,13 @@ pip install -e .
 ```bash
 python -m radio76.main
 ```
+
+**Notes**
+- Turn on FT 710
+```
+PS C:\Users\beckd\Desktop\hamlib-w32-4.6.5\bin> .\rigctl.exe -m 1049 -r COM7 -s 38400 -vv set_powerstat 1
+```
+- Turn off FT 710
+```
+PS C:\Users\beckd\Desktop\hamlib-w32-4.6.5\bin> .\rigctl.exe -m 1049 -r COM7 -s 38400 -vv set_powerstat 0
+```
