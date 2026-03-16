@@ -9,4 +9,5 @@ dependencies:
   - pip:
       - textual-plot
       - textual-dev
+      - sounddevice
 prefix: C:\Users\beckd\anaconda3\envs\radio76

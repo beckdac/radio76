@@ -12,7 +12,8 @@ UDP_PORT = 5005
 CHANNELS = 1
 DEVICE = 15
 DTYPE = 'int16'
-BLOCK_SIZE = 256 # Frames per buffer
+BLOCK_SIZE = 1024 # Frames per buffer
+PACKET_UPDATE = 1000
 
 # Create UDP Socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -23,9 +24,9 @@ async def inputstream_generator(channels=1, **kwargs):
     loop = asyncio.get_event_loop()
 
     def callback(indata, frame_count, time_info, status):
-        loop.call_soon_threadsafe(q_in.put_nowait, (indata.copy(), status))
+        loop.call_soon_threadsafe(q_in.put_nowait, (indata, status))
 
-    stream = sd.InputStream(callback=callback, channels=channels, **kwargs)
+    stream = sd.RawInputStream(callback=callback, channels=channels, **kwargs)
     sent_packets = 0
     with stream:
         while True:
@@ -33,8 +34,8 @@ async def inputstream_generator(channels=1, **kwargs):
         
             # Send raw bytes
             sent_packets += 1
-            sock.sendto(audio_data.tobytes(), (UDP_IP, UDP_PORT))
-            if sent_packets % 100 == 0:
+            sock.sendto(audio_data, (UDP_IP, UDP_PORT))
+            if sent_packets % PACKET_UPDATE == 0:
                 print(f"sent {sent_packets} packets")
             q_in.task_done()
             #yield indata, status
