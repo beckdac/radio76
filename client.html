@@ -1,30 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Real-time Audio FFT</title>
+    <title>Real-time Spectrogram</title>
     <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
-<body>
-    <div id="fft-chart" style="width:100%;height:400px;"></div>
-    <script>
-	const socket = io('http://localhost:5000', { transports: ['websocket'] });
-        const chartDiv = document.getElementById('fft-chart');
+<body style="background: #111;">
+    <div id="heatmap-chart" style="width:100%; height:90vh;"></div>
 
-        // Initialize the plot
-        Plotly.newPlot(chartDiv, [{
-            y: [],
-            mode: 'lines',
-            line: {color: '#17BECF'}
-        }], {
-            title: 'Live Frequency Spectrum',
-            xaxis: { title: 'Frequency Bin' },
-            yaxis: { title: 'Magnitude', range: [0, 2] }
-        });
+    <script>
+        const socket = io('http://localhost:5000', { transports: ['websocket'] });
+        const chartDiv = document.getElementById('heatmap-chart');
+
+        const MAX_HISTORY = 100; // How many time-slices to show
+        let spectrogramData = Array(MAX_HISTORY).fill(Array(1025).fill(0));
+
+        const data = [{
+            z: spectrogramData,
+            type: 'heatmap',
+            colorscale: 'Viridis', // Try 'Hot', 'Magma', or 'Jet'
+            showscale: true
+        }];
+
+        const layout = {
+            title: { text: 'Live Spectrogram', font: { color: 'white' } },
+            paper_bgcolor: '#111',
+            plot_bgcolor: '#111',
+            xaxis: { title: 'Frequency Bin', tickcolor: 'white', font: { color: 'white' } },
+            yaxis: { title: 'Time (History)', tickcolor: 'white', font: { color: 'white' } }
+        };
+
+        Plotly.newPlot(chartDiv, data, layout);
 
         socket.on('audio_fft', function(msg) {
-            // Update only the y-values for better performance
-            Plotly.update(chartDiv, { y: [msg.data] });
+            // Remove oldest row, add newest row
+            spectrogramData.shift();
+            spectrogramData.push(msg.data);
+
+            // Use restyle for high-performance 2D data updates
+            Plotly.restyle(chartDiv, { z: [spectrogramData] });
         });
     </script>
 </body>

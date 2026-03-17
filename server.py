@@ -28,9 +28,12 @@ def emit_worker():
         # FFT Calculation
         windowed = data[:, 0] * np.hanning(len(data))
         fft_data = np.abs(np.fft.rfft(windowed))
-        
-        # Emit to all clients
-        sio.emit('audio_fft', {'data': fft_data.tolist()})
+
+        # Log scaling often looks better for heatmaps
+        # np.log1p(x) is log(1+x) to avoid log(0)
+        log_fft = np.log1p(fft_data[0:150])
+
+        sio.emit('audio_fft', {'data': log_fft.tolist()})
 
 @sio.event
 def connect(sid, environ):
