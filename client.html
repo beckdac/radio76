@@ -37,14 +37,17 @@
             z: spectrogramData,
             type: 'heatmap',
             colorscale: 'Blackbody', // Try 'Hot', 'Magma', or 'Jet', 'Viridis'
-            showscale: true
+            showscale: true,
+	    zmin: 0,
+	    zmax: 1000,
+	    zuto: false
         }];
 
         const layout = {
             title: { text: 'Live Spectrogram', font: { color: 'white' } },
             paper_bgcolor: '#111',
             plot_bgcolor: '#111',
-            xaxis: { title: 'Frequency Bin', tickcolor: 'white', font: { color: 'white' } },
+            xaxis: { title: 'Frequency Bin (max 3kHz)', tickcolor: 'white', font: { color: 'white' } },
             yaxis: { title: 'Time (History)', tickcolor: 'white', font: { color: 'white' } }
         };
 
