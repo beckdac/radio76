@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-time Audio FFT</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div id="fft-chart" style="width:100%;height:400px;"></div>
+    <script>
+	const socket = io('http://localhost:5000', { transports: ['websocket'] });
+        const chartDiv = document.getElementById('fft-chart');
+
+        // Initialize the plot
+        Plotly.newPlot(chartDiv, [{
+            y: [],
+            mode: 'lines',
+            line: {color: '#17BECF'}
+        }], {
+            title: 'Live Frequency Spectrum',
+            xaxis: { title: 'Frequency Bin' },
+            yaxis: { title: 'Magnitude', range: [0, 2] }
+        });
+
+        socket.on('audio_fft', function(msg) {
+            // Update only the y-values for better performance
+            Plotly.update(chartDiv, { y: [msg.data] });
+        });
+    </script>
+</body>
+</html>
+
