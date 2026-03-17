@@ -29,27 +29,35 @@ def emit_worker():
     """Consumer: Runs in a standard Python thread."""
     print("Emission worker started.")
 
-    high = 3000
-    low = 50
-    columns = 200 
-    gain = 100
-    delta_f = (high - low) / (columns - 1)
-    fftsize = math.ceil(SAMPLERATE / delta_f)
-    low_bin = math.floor(low / delta_f)
+    gain = 0.001
+    max_freq = 2400
+    T_CYC = 15
+    BPT = 2
+    SYM_RATE = 6.25
+
+    fft_len = int(BPT * SAMPLERATE // SYM_RATE)
+    fft_out_len = fft_len // 2 + 1
+    nFreqs = int(fft_out_len * 2 * max_freq / SAMPLERATE)
+    audio_buffer = np.zeros(fft_len, dtype=np.float32)
+    fft_in = np.zeros(fft_len, dtype=np.float32)
+    fft_window = np.hanning(fft_len).astype(np.float32)
 
     while True:
         # Blocks until data is available
         data = audio_queue.get()
 
+        samples = data.astype(np.float32).flatten()
+        ns = len(samples)
+        audio_buffer[:-ns] = audio_buffer[ns:]
+        audio_buffer[-ns:] = samples
+
         # FFT Calculation
-        magnitude = np.abs(np.fft.rfft(data[:, 0], n=fftsize))[0:columns]
-        magnitude *= gain / fftsize
+        np.multiply(audio_buffer, fft_window, out=fft_in)
+        zfft = np.fft.rfft(fft_in)[:nFreqs]
+        sp = np.clip(zfft.real*zfft.real + zfft.imag*zfft.imag, gain, None)
 
-        # Log scaling often looks better for heatmaps
-        # np.log1p(x) is log(1+x) to avoid log(0)
-        log_fft = np.log1p(magnitude)
-
-        sio.emit('audio_fft', {'data': log_fft.tolist()})
+        # send data
+        sio.emit('audio_fft', {'data': sp.tolist()})
 
 @sio.event
 def connect(sid, environ):
