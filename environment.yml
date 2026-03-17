@@ -10,4 +10,6 @@ dependencies:
       - textual-plot
       - textual-dev
       - sounddevice
+      - python-socketio
+      - eventlet
 prefix: C:\Users\beckd\anaconda3\envs\radio76
