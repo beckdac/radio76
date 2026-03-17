@@ -31,15 +31,10 @@ class AudioProtocol(asyncio.DatagramProtocol):
 
 
 
-colors = 30, 34, 35, 91, 93, 97
-chars = ' :%#\t#%:'
+chars = '.:-=+*#%@'
 gradient = []
-for bg, fg in zip(colors, colors[1:]):
-    for char in chars:
-        if char == '\t':
-            bg, fg = fg, bg
-        else:
-            gradient.append(f'\x1b[{fg};{bg + 10}m{char}')
+for char in chars:
+    gradient.append(f"{char}")
 
 
 
@@ -68,7 +63,7 @@ async def audio_player():
             magnitude *= gain / fftsize
             line = (gradient[int(np.clip(x, 0, 1) * (len(gradient) - 1))]
                     for x in magnitude[low_bin:low_bin + columns])
-            print(*line, sep='', end='\x1b[0m\n')
+            print(*line, sep='', end='\n')
 
             # Write data to output stream
             stream.write(data)
