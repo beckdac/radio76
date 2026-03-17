@@ -31,7 +31,7 @@ class AudioProtocol(asyncio.DatagramProtocol):
 
 
 
-chars = '.:-=+*#%@'
+chars = ' .:-=+*#%@'
 gradient = []
 for char in chars:
     gradient.append(f"{char}")
