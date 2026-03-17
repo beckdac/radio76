@@ -30,7 +30,7 @@ def emit_worker():
     print("Emission worker started.")
 
     gain = 0.001
-    max_freq = 2400
+    max_freq = 3000
     T_CYC = 15
     BPT = 2
     SYM_RATE = 6.25
