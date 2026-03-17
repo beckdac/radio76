@@ -6,6 +6,24 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body style="background: #111;">
+    <select id="colorscale-picker">
+  	<option value="Blackbody">Blackbody</option>
+        <option value="Viridis">Viridis</option>
+  	<option value="Reds">Reds</option>
+  	<option value="Hot">Hot</option>
+  	<option value="Magma">Magma</option>
+  	<option value="Jet">Jet</option>
+  	<option value="YlOrRd">YlOrRd</option>
+  	<option value="YlGnBu">YlGnBu</option>
+  	<option value="RdBu">RdBu</option>
+  	<option value="Portland">Portland</option>
+  	<option value="Picnic">Picnic</option>
+  	<option value="Greys">Greys</option>
+  	<option value="Greens">Greens</option>
+  	<option value="Electric">Electric</option>
+  	<option value="Earth">Earth</option>
+  	<option value="Bluered">Bluered</option>
+    </select>
     <div id="heatmap-chart" style="width:100%; height:90vh;"></div>
 
     <script>
@@ -18,7 +36,7 @@
         const data = [{
             z: spectrogramData,
             type: 'heatmap',
-            colorscale: 'Viridis', // Try 'Hot', 'Magma', or 'Jet'
+            colorscale: 'Blackbody', // Try 'Hot', 'Magma', or 'Jet', 'Viridis'
             showscale: true
         }];
 
@@ -40,6 +58,13 @@
             // Use restyle for high-performance 2D data updates
             Plotly.restyle(chartDiv, { z: [spectrogramData] });
         });
+
+	// Control Event Listener
+  	document.getElementById('colorscale-picker').addEventListener('change', function() {
+    	    var newScale = this.value;
+    	    // Update only the colorscale of the first trace
+    	    Plotly.restyle(chartDiv, 'colorscale', [newScale]);
+  	});
     </script>
 </body>
 </html>
