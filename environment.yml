@@ -7,9 +7,8 @@ dependencies:
   - python=3.13.12
   - pip
   - pip:
-      - textual-plot
-      - textual-dev
       - sounddevice
       - python-socketio
       - eventlet
+      - pywsjtx
 prefix: C:\Users\beckd\anaconda3\envs\radio76
