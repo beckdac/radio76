@@ -9,6 +9,8 @@
         
         /* LED Styling */
         #led { width: 30px; height: 30px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-left: 15px; border: 2px solid #333; transition: background-color 0.3s; }
+        #gatewayLed { width: 30px; height: 30px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-left: 15px; border: 2px solid #333; transition: background-color 0.3s; }
+        #WSJTXLed { width: 30px; height: 30px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-left: 15px; border: 2px solid #333; transition: background-color 0.3s; }
         .led-off { background-color: cyan; box-shadow: 0 0 10px cyan; }
         .led-on { background-color: magenta; box-shadow: 0 0 10px magenta; }
 
@@ -27,8 +29,10 @@
     <!-- Timer Display -->
     <div id="timerContainer">
 	Last gateway update: <span id="gatewayUpdateTime">Never</span>. <span id="secondsSinceGateway">0</span> seconds ago.
+        <div id="gatewayLed" class="led-off"></div>
 	<br>
 	Last WSJTX update: <span id="WSJTXUpdateTime">Never</span>. <span id="secondsSinceWSJTX">0</span> seconds ago.
+        <div id="WSJTXLed" class="led-off"></div>
     </div>
 
     <div class="control-group">
@@ -87,6 +91,8 @@
         }
 
         function toggleLed() {
+            const led = document.getElementById('led');
+	    isLedOn = led.classList.contains('led-on')
             isLedOn = !isLedOn;
             updateLedUI(isLedOn);
             sendUpdate('led', isLedOn);
@@ -94,17 +100,23 @@
 
         function updateLedUI(state) {
             const led = document.getElementById('led');
-            isLedOn = state;
-            led.className = state ? 'led-on' : 'led-off';
+	    isLedOn = led.classList.contains('led-on')
+            led.className = state ? 'led-off' : 'led-on';
         }
 
 	socket.on('gateway_heartbeat', (data) => {
 	    resetGatewayTimer();
             document.getElementById('gatewayUpdateTime').innerText = data.time;
+            const led = document.getElementById('gatewayLed');
+	    isLedOn = led.classList.contains('led-on')
+            led.className = isLedOn ? 'led-off' : 'led-on';
 	});
 
         socket.on('control_update', (data) => {
             resetWSJTXTimer(); // Reset when remote update received
+            const led = document.getElementById('WSJTXLed');
+	    isLedOn = led.classList.contains('led-on')
+            led.className = isLedOn ? 'led-off' : 'led-on';
             
             if (data.type === 'text') {
                 document.getElementById('textInput').value = data.value;
