@@ -1,4 +1,6 @@
 import asyncio
+from datetime import datetime
+
 from aiohttp import web
 import socketio
 
@@ -6,6 +8,13 @@ import socketio
 sio = socketio.AsyncServer(cors_allowed_origins='*')
 app = web.Application()
 sio.attach(app)
+
+# --- Routes ---
+async def index(request):
+    """Serves the index.html file."""
+    return web.FileResponse('index.html')
+
+app.router.add_get('/', index)
 
 @sio.event
 async def connect(sid, environ):
@@ -25,24 +34,23 @@ async def disconnect(sid):
     print(f'Client disconnected: {sid}')
 
 
-async def led_task():
-    print("Doing work...")
-    data = { 'type': 'led', 'value': False }
+async def heartbeat_task():
+    data = { }
     try:
         while True:
             await asyncio.sleep(2)  # Run every 2 seconds
-            print(f'sending update: {data}')
+            now = datetime.now()
+            data['time'] = now.strftime("%Y-%m-%d %H:%M:%S")
             await sio.emit('gateway_heartbeat', data)
-            data['value'] = not data['value']
     except asyncio.CancelledError:
-        print("Background task cancelled")
+        print("Heartbeat task cancelled")
 
 async def start_background_tasks(app):
-    app['led'] = asyncio.create_task(led_task())
+    app['heartbeat'] = asyncio.create_task(heartbeat_task())
 
 async def cleanup_background_tasks(app):
-    app['led'].cancel()
-    await app['led']
+    app['heartbeat'].cancel()
+    await app['heartbeat']
 
 # Register the startup and cleanup signals
 app.on_startup.append(start_background_tasks)

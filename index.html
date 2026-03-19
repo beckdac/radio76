@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WSJTX Monitor</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; background: #f9f9f9; }
+        .control-group { margin-bottom: 20px; border: 1px solid #ccc; padding: 15px; border-radius: 8px; background: white; position: relative; }
+        
+        /* LED Styling */
+        #led { width: 30px; height: 30px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-left: 15px; border: 2px solid #333; transition: background-color 0.3s; }
+        .led-off { background-color: cyan; box-shadow: 0 0 10px cyan; }
+        .led-on { background-color: magenta; box-shadow: 0 0 10px magenta; }
+
+        /* Timer Styling */
+        #timerContainer { font-weight: bold; color: #555; margin-bottom: 10px; font-size: 0.9em; }
+        #seconds { color: #d9534f; }
+
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        td { border: 1px solid #ddd; padding: 12px; }
+        [contenteditable] { background: #fffbe6; }
+    </style>
+</head>
+<body>
+    <h2>WSJTX Monitor Dashboard</h2>
+
+    <!-- Timer Display -->
+    <div id="timerContainer">
+	Last gateway update: <span id="gatewayUpdateTime">Never</span>. <span id="secondsSinceGateway">0</span> seconds ago.
+	<br>
+	Last WSJTX update: <span id="WSJTXUpdateTime">Never</span>. <span id="secondsSinceWSJTX">0</span> seconds ago.
+    </div>
+
+    <div class="control-group">
+        <label><strong>Text Box:</strong></label><br>
+        <input type="text" id="textInput" style="width: 95%;" oninput="sendUpdate('text', this.value)">
+    </div>
+
+    <div class="control-group">
+        <label><strong>Pull Down:</strong></label><br>
+        <select id="selectInput" onchange="sendUpdate('dropdown', this.value)">
+            <option value="Option 1">Option 1</option>
+            <option value="Option 2">Option 2</option>
+        </select>
+    </div>
+
+    <div class="control-group">
+        <button id="actionButton" onclick="toggleLed()">Toggle LED Status</button>
+        <div id="led" class="led-off"></div>
+    </div>
+
+    <div class="control-group">
+        <label><strong>Table:</strong></label>
+        <table>
+            <tr><td contenteditable="true" id="tableCell" oninput="sendUpdate('table', this.innerText)">Edit me...</td></tr>
+        </table>
+    </div>
+
+    <script>
+	const socket = io('http://localhost:5000', { transports: ['websocket'] });
+        let isLedOn = false;
+        let secondsSinceGatewayUpdate = 0;
+        let secondsSinceWSJTXUpdate = 0;
+
+        // --- Timer Logic ---
+        setInterval(() => {
+            secondsSinceGatewayUpdate++;
+            secondsSinceWSJTXUpdate++;
+            document.getElementById('secondsSinceGateway').innerText = secondsSinceGatewayUpdate;
+            document.getElementById('secondsSinceWSJTX').innerText = secondsSinceWSJTXUpdate;
+        }, 1000);
+
+        function resetGatewayTimer() {
+            secondsSinceGatewayUpdate = 0;
+            document.getElementById('secondsSinceGateway').innerText = "0";
+        }
+
+        function resetWSJTXTimer() {
+            secondsSinceWSJTXUpdate = 0;
+            document.getElementById('secondsSinceWSJTX').innerText = "0";
+        }
+
+        // --- Communication Logic ---
+        function sendUpdate(type, value) {
+            resetWSJTXTimer(); // Reset when user interacts
+            socket.emit('update_control', { type, value });
+        }
+
+        function toggleLed() {
+            isLedOn = !isLedOn;
+            updateLedUI(isLedOn);
+            sendUpdate('led', isLedOn);
+        }
+
+        function updateLedUI(state) {
+            const led = document.getElementById('led');
+            isLedOn = state;
+            led.className = state ? 'led-on' : 'led-off';
+        }
+
+	socket.on('gateway_heartbeat', (data) => {
+	    resetGatewayTimer();
+            document.getElementById('gatewayUpdateTime').innerText = data.time;
+	});
+
+        socket.on('control_update', (data) => {
+            resetWSJTXTimer(); // Reset when remote update received
+            
+            if (data.type === 'text') {
+                document.getElementById('textInput').value = data.value;
+            } else if (data.type === 'dropdown') {
+                document.getElementById('selectInput').value = data.value;
+            } else if (data.type === 'table') {
+                document.getElementById('tableCell').innerText = data.value;
+            } else if (data.type === 'led') {
+                updateLedUI(data.value);
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
