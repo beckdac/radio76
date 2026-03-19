@@ -4,7 +4,7 @@
     <title>WSJTX Monitor</title>
     <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; background: #f9f9f9; }
+        body { font-family: sans-serif; padding: 20px; max-width: 80%; margin: auto; background: #f9f9f9; }
         .control-group { margin-bottom: 20px; border: 1px solid #ccc; padding: 15px; border-radius: 8px; background: white; position: relative; }
         
         /* LED Styling */
@@ -131,7 +131,7 @@
 	    WSJTXLedBlink();
 	    console.log(data);
 	    const tbody = document.getElementById('decodeTableBody');
-	    //tbody.innerHTML = ''; // clear
+	    tbody.innerHTML = ''; // clear
 	    data.rows.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.className = 'decode-table-row';

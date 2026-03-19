@@ -50,7 +50,7 @@ async def listen_WSJTX_multicast():
                 the_packet = pywsjtx.WSJTXPacketClassFactory.from_udp_packet(addr, data)
 
             if type(the_packet) == pywsjtx.HeartBeatPacket:
-                print("heartbeat")
+                #print("heartbeat")
                 max_schema = max(the_packet.max_schema, MY_MAX_SCHEMA)
                 reply_beat_packet = pywsjtx.HeartBeatPacket.Builder(the_packet.wsjtx_id, max_schema)
                 await loop.run_in_executor(None, sock.sendto, reply_beat_packet, addr)
@@ -58,12 +58,12 @@ async def listen_WSJTX_multicast():
                 out['time'] = now.strftime("%Y-%m-%d %H:%M:%S")
                 await sio.emit('heartbeat', out)
             elif type(the_packet) == pywsjtx.DecodePacket:
-                print("decode")
+                #print("decode")
                 out['id'] = the_packet.wsjtx_id
                 out['new'] = the_packet.new_decode
-                out['time'] = the_packet.time.strftime("%Y-%m-%d %H:%M:%S %f")
+                out['time'] = the_packet.time.strftime("%H:%M:%S")
                 out['snr'] = the_packet.snr
-                out['delta_time'] = the_packet.delta_t
+                out['delta_time'] = f"{the_packet.delta_t:.4g}"
                 out['delta_hz'] = the_packet.delta_f
                 out['mode'] = the_packet.mode
                 out['message'] = the_packet.message
@@ -71,7 +71,7 @@ async def listen_WSJTX_multicast():
                 out['off_air'] = the_packet.off_air
                 await sio.emit('decode', {"rows": [out]})
             elif type(the_packet) == pywsjtx.StatusPacket:
-                print("status")
+                #print("status")
                 out['id'] = the_packet.wsjtx_id
                 out['dial_freq'] = the_packet.dial_frequency
                 out['mode'] = the_packet.mode
@@ -123,7 +123,7 @@ async def disconnect(sid):
 
 
 async def heartbeat_task():
-    print("heartbeat task starting")
+    print("Heartbeat task starting")
     data = { }
     try:
         while True:
