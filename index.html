@@ -127,16 +127,27 @@
             led.className = isLedOn ? 'led-off' : 'led-on';
 	}
 
+	socket.on('heartbeat', (data) => {
+	    WSJTXLedBlink();
+            document.getElementById('WSJTXUpdateTime').innerText = data.time;
+	});
+
+	socket.on('status', (data) => {
+	    WSJTXLedBlink();
+	});
+
 	socket.on('decode', (data) => {
 	    WSJTXLedBlink();
-	    console.log(data);
 	    const tbody = document.getElementById('decodeTableBody');
-	    tbody.innerHTML = ''; // clear
+	    //tbody.innerHTML = ''; // clear
 	    data.rows.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.className = 'decode-table-row';
 		    tr.innerHTML = `<td>${row.id}</td><td>${row.new}</td><td>${row.time}</td><td>${row.snr}</td><td>${row.delta_time}</td><td>${row.delta_hz}</td><td>${row.mode}</td><td>${row.message}</td><td>${row.low_conf}</td><td>${row.off_air}</td>`;
-                tbody.appendChild(tr);
+                tbody.prepend(tr);
+		if (tbody.children.length > 50) {
+		    tbody.removeChild(tbody.lastElementChild);
+		}
             });
 	});
 
