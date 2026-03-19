@@ -91,6 +91,50 @@ async def listen_WSJTX_multicast():
                 out['fast_mode'] = the_packet.fast_mode
                 out['special_op_mode'] = the_packet.special_op_mode
                 await sio.emit('status', out)
+            elif type(the_packet) == pywsjtx.QSOLoggedPacket:
+                print("QSO Logged")
+                out['id'] = the_packet.wsjtx_id
+                out['datetime_off'] = the_packet.datetime_off
+                out['call'] = the_packet.call
+                out['grid'] = the_packet.grid
+                out['frequency'] = the_packet.frequency
+                out['mode'] = the_packet.mode
+                out['report_sent'] = the_packet.report_sent
+                out['report_recv'] = the_packet.report_recv
+                out['tx_power'] = the_packet.tx_power
+                out['comments'] = the_packet.comments
+                out['name'] = the_packet.name
+                out['datetime_on'] = the_packet.datetime_on
+                out['op_call'] = the_packet.op_call
+                out['my_call'] = the_packet.my_call
+                out['my_grid'] = the_packet.my_grid
+                out['exchange_sent'] = the_packet.exchange_sent
+                out['exchange_recv'] = the_packet.exchange_recv
+                await sio.emit('qso_logged', out)
+            elif type(the_packet) == pywsjtx.Packet:
+                print("")
+                await sio.emit('', out)
+            elif type(the_packet) == pywsjtx.Packet:
+                print("")
+                await sio.emit('', out)
+            elif type(the_packet) == pywsjtx.Packet:
+                print("")
+                await sio.emit('', out)
+            elif type(the_packet) == pywsjtx.Packet:
+                print("")
+                await sio.emit('', out)
+            elif type(the_packet) == pywsjtx.Packet:
+                print("")
+                await sio.emit('', out)
+            elif type(the_packet) == pywsjtx.Packet:
+                print("")
+                await sio.emit('', out)
+            elif type(the_packet) == pywsjtx.Packet:
+                print("")
+                await sio.emit('', out)
+            elif type(the_packet) == pywsjtx.Packet:
+                print("")
+                await sio.emit('', out)
     except asyncio.CancelledError:
         print("WSJTX UDP multicast listener task cancelled")
     except Exception as e:
