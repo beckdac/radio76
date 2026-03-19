@@ -34,6 +34,26 @@ async def disconnect(sid):
     print(f'Client disconnected: {sid}')
 
 
+async def decode_task():
+    data = { }
+    try:
+        while True:
+            await asyncio.sleep(15)
+            data['id'] = 42
+            data['new'] = True
+            data['time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            data['snr'] = -1
+            data['delta_time'] = .002
+            data['delta_hz'] = 42
+            data['mode'] = 'FT8'
+            data['message'] = 'I got your number'
+            data['low_conf'] = False
+            data['off_air'] = True
+            print("decode")
+            await sio.emit('decode', {"rows": [data]})
+    except asyncio.CancelledError:
+        print("Decode task cancelled")
+
 async def heartbeat_task():
     data = { }
     try:
@@ -47,10 +67,13 @@ async def heartbeat_task():
 
 async def start_background_tasks(app):
     app['heartbeat'] = asyncio.create_task(heartbeat_task())
+    app['decode'] = asyncio.create_task(decode_task())
 
 async def cleanup_background_tasks(app):
     app['heartbeat'].cancel()
     await app['heartbeat']
+    app['decode'].cancel()
+    await app['decode']
 
 # Register the startup and cleanup signals
 app.on_startup.append(start_background_tasks)

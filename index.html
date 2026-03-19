@@ -18,6 +18,9 @@
         #timerContainer { font-weight: bold; color: #555; margin-bottom: 10px; font-size: 0.9em; }
         #seconds { color: #d9534f; }
 
+	/* Decode Table */
+	.decode-table-row { color: #0056b3, font-weight: 500 }
+
         table { border-collapse: collapse; width: 100%; margin-top: 10px; }
         td { border: 1px solid #ddd; padding: 12px; }
         [contenteditable] { background: #fffbe6; }
@@ -54,9 +57,14 @@
     </div>
 
     <div class="control-group">
-        <label><strong>Table:</strong></label>
-        <table>
-            <tr><td contenteditable="true" id="tableCell" oninput="sendUpdate('table', this.innerText)">Edit me...</td></tr>
+        <strong>WSJTX Decodes</strong>
+        <table id="decodeTable">
+            <thead>
+		    <tr><th>ID</th><th>New</th><th>Time</th><th>SNR</th><th>&Delta; t</th><th>&Delta; Hz</th><th>Mode</th><th>Message</th><th>Low Conf.</th><th>Off Air</th></tr>
+            </thead>
+            <tbody id="decodeTableBody">
+                <tr><td colspan="10">Waiting for server data...</td></tr>
+            </tbody>
         </table>
     </div>
 
@@ -112,12 +120,29 @@
             led.className = isLedOn ? 'led-off' : 'led-on';
 	});
 
-        socket.on('control_update', (data) => {
+	function WSJTXLedBlink() {
             resetWSJTXTimer(); // Reset when remote update received
             const led = document.getElementById('WSJTXLed');
 	    isLedOn = led.classList.contains('led-on')
             led.className = isLedOn ? 'led-off' : 'led-on';
-            
+	}
+
+	socket.on('decode', (data) => {
+	    WSJTXLedBlink();
+	    console.log(data);
+	    const tbody = document.getElementById('decodeTableBody');
+	    //tbody.innerHTML = ''; // clear
+	    data.rows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'decode-table-row';
+		    tr.innerHTML = `<td>${row.id}</td><td>${row.new}</td><td>${row.time}</td><td>${row.snr}</td><td>${row.delta_time}</td><td>${row.delta_hz}</td><td>${row.mode}</td><td>${row.message}</td><td>${row.low_conf}</td><td>${row.off_air}</td>`;
+                tbody.appendChild(tr);
+            });
+	});
+
+        socket.on('control_update', (data) => {
+	    WSJTXLedBlink();
+
             if (data.type === 'text') {
                 document.getElementById('textInput').value = data.value;
             } else if (data.type === 'dropdown') {
