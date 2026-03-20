@@ -262,7 +262,7 @@ async def heartbeat_task(state_update_queue):
                 #print(f"{state}")
                 await sio.emit("gateway_heartbeat", state.__dict__)
             if new_canidate:
-                print(f"initiating reply to {new_canidate["message]"}")
+                print(f"initiating reply to {new_canidate['message']}")
                 reply_pkt = pywsjtx.ReplyPacket.Builder(new_canidate["pkt"])
                 await loop.run_in_executor(None, sock.sendto, reply_pkt, addr)
     except asyncio.CancelledError:
@@ -425,9 +425,9 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                     continue
                 dict_state = (state.dial_freq, state.mode)
                 # remove from old dict, if there
-                calls_tried[dict_state][data.call] = False
+                calls_tried[dict_state][data["call"]] = False
                 # add to new dict
-                calls_73[dict_state][data.call] = True
+                calls_73[dict_state][data["call"]] = True
             elif data["type"] == StateMachineMessageType.SOCKET_INFO:
                 state.sock = data["sock"]
                 state.addr = data["addr"]
