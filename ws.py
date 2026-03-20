@@ -249,9 +249,9 @@ async def state_machine_task(state_machine_queue, state_update_queue):
     try:
         while True:
             data = await state_machine_queue.get()
-            print(f"message received: {data}")
+            #print(f"message received: {data}")
             if data["type"] == StateMachineMessageType.STATUS:
-                print("looking at status message")
+                #print("looking at status message")
                 reset = False
                 if not data["tx_enabled"] and not data["transmitting"]:
                     state["busy"] = False
@@ -279,7 +279,7 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                 if data["transmitting"]:
                     calls_tried[dict_state][data["dx_call"]] = True
             elif data["type"] == StateMachineMessageType.DECODE:
-                print("received decode message")
+                #print(f"received decode message: {data}")
                 # skip if replay
                 if not data["new"]:
                     continue
@@ -301,6 +301,7 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                 if not data["message"].startswith("CQ") or data["message"].startswith(
                     "CQ DX"
                 ):
+                    #print(f"culled for message: {data['message']}")
                     continue
                 # make sure it isn't someone we have worked before
                 # extract call
@@ -313,28 +314,32 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                         call = tokens[1]
                     if calls_tried[dict_state].get(call, False) or \
                             calls_73[dict_state].get(call, False):
+                        #print("culled for previous message")
                         continue
                 else:
-                    # malformed message
-                    print(f"{__file__}:{__name__} : malformed message: {data}")
+                    # malformed CQ message
+                    print(f"{__file__}:{__name__} : malformed CQ message: {data}")
                     continue
                 # apply snr threshold
                 if data["snr"] < state["snr_threshold"]:
+                    #print(f"culled for snr: {data['snr']}")
                     continue
                 # apply delta time threshold
-                if float(data["delta_time"]) < state["delta_time_threshold"]:
+                if abs(float(data["delta_time"])) > abs(state["delta_time_threshold"]):
+                    #print(f"culled for delta time: {data['delta_time']}")
                     continue
                 # compare against current canidate
-                if candidate is not None:
-                    cdiff = datetime.now() - candidate.last
+                if canidate is not None:
+                    cdiff = datetime.now() - canidate["last"]
                     if (
                         cdiff.total_seconds() < state["max_cq_decode_age"]
                         and canidate["snr"] > data["snr"]
                     ):
+                        #print("culled for being less than previous valid canidate")
                         continue
-                else:
-                    continue
-                print("got to end of decode processing for new candidate")
+                data["last"] = datetime.now()
+                canidate = data.copy()
+                print(f"new canidate: {canidate}")
             elif data["type"] == StateMachineMessageType.QSO_LOGGED:
                 # make sure the mode matches
                 if data["mode"] != state["mode"]:
