@@ -17,6 +17,7 @@
         #statusTXEnabledLed { width: 20px; height: 20px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-left: 15px; border: 2px solid #333; transition: background-color 0.3s; }
         #statusTransmittingLed { width: 20px; height: 20px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-left: 15px; border: 2px solid #333; transition: background-color 0.3s; }
         #statusDecodingLed { width: 20px; height: 20px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-left: 15px; border: 2px solid #333; transition: background-color 0.3s; }
+        #statusTXWatchdogLed { width: 20px; height: 20px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-left: 15px; border: 2px solid #333; transition: background-color 0.3s; }
         .led-off { background-color: cyan; box-shadow: 0 0 10px cyan; }
         .led-on { background-color: magenta; box-shadow: 0 0 10px magenta; }
 
@@ -25,10 +26,10 @@
         #seconds { color: #d9534f; }
 
 	/* QSO Logged Table */
-	.qso-logged-row { color: #0056b3, font-weight: 500 }
+	.qso-logged-row { color: #0056b3, font-size: clamp(0.5rem, 1vw, 1.5rem) }
 
 	/* Decode Table */
-	.decode-table-row { color: #0056b3, font-weight: 500 }
+	.decode-table-row { color: #0056b3, font-size: clamp(0.5rem, 1vw, 1.5rem) }
 
         table { border-collapse: collapse; width: 100%; margin-top: 10px; }
         td { border: 1px solid #ddd; padding: 12px; }
@@ -61,7 +62,7 @@
 		<tr><th>Decoding</th><td><div id="statusDecodingLed" class="led-off"></div></tr>
 		<tr><th>RX DF</th><td><span id="statusRXDF">-</span></tr>
 		<tr><th>TX DF</th><td><span id="statusTXDF">-</span></tr>
-		<tr><th>TX Watchdog</th><td><span id="statusTXWatchdog">-</span></tr>
+		<tr><th>TX Watchdog</th><td><div id="statusTXWatchdogLed" class="led-off"></div></tr>
 	    </tbody>
 	</table>
 	<table id="statusTableContact", class="status-table">
@@ -189,7 +190,8 @@
 	    document.getElementById('statusDECall').innerText = data.de_call;
 	    document.getElementById('statusDEGrid').innerText = data.de_grid;
 	    document.getElementById('statusDXGrid').innerText = data.dx_grid;
-	    document.getElementById('statusTXWatchdog').innerText = data.tx_watchdog;
+            led = document.getElementById('statusTXWatchdogLed');
+            led.className = data.tx_watchdog ? 'led-on' : 'led-off';
 	    document.getElementById('statusSubMode').innerText = data.sub_mode;
 	    document.getElementById('statusSpecialOpMode').innerText = data.special_op_mode;
 	});
