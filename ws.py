@@ -261,7 +261,7 @@ async def heartbeat_task(state_update_queue):
                 state.addr = None
                 #print(f"{state}")
                 await sio.emit("gateway_heartbeat", state.__dict__)
-            if new_canidate:
+            if not state.busy and new_canidate:
                 print(f"initiating reply to {new_canidate['message']}")
                 reply_pkt = pywsjtx.ReplyPacket.Builder(new_canidate["pkt"])
                 await loop.run_in_executor(None, sock.sendto, reply_pkt, addr)
