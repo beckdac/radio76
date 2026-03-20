@@ -6,6 +6,7 @@ canidate next calls and manages a state machine / model.
 """
 
 import asyncio
+import copy
 from datetime import datetime
 from enum import Enum
 import json
@@ -22,6 +23,7 @@ class StateMachineMessageType(Enum):
     STATUS = 1
     DECODE = 2
     QSO_LOGGED = 3
+    SOCKET_INFO = 4
 
 
 # Create an Async Socket.IO server
@@ -55,12 +57,20 @@ async def listen_WSJTX_multicast(state_machine_queue):
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
     print(f"Listening to WSJTX multicast {MULTICAST_GRP}:{MULTICAST_PORT}")
+    socket_info_sent = False
 
     loop = asyncio.get_event_loop()
     try:
         while True:
             # Receive data asynchronously
             data, addr = await loop.run_in_executor(None, sock.recvfrom, 4096)
+
+            # TODO: this uses the first sender as the address for all future comms
+            # from outside of this loop
+            if not socket_info_sent:
+                await state_machine_queue.put({'type':StateMachineMessageType.SOCKET_INFO, 
+                                               'sock':sock, 'addr':addr})
+                socket_info_sent = True
 
             out = {}
 
@@ -92,6 +102,7 @@ async def listen_WSJTX_multicast(state_machine_queue):
                 await sio.emit("decode", {"rows": [out]})
                 sm_out = out
                 sm_out["type"] = StateMachineMessageType.DECODE
+                sm_out["pkt"] = the_packet
                 await state_machine_queue.put(sm_out)
             elif type(the_packet) == pywsjtx.StatusPacket:
                 # print("status")
@@ -150,6 +161,7 @@ async def listen_WSJTX_multicast(state_machine_queue):
                 sm_out = {}
                 sm_out["type"] = StateMachineMessageType.QSO_LOGGED
                 sm_out["call"] = the_packet.call
+                sm_out["mode"] = the_packet.mode
                 await state_machine_queue.put(sm_out)
             elif type(the_packet) == pywsjtx.ClosePacket:
                 print("WSJTX closing packet, raising asyncio.CancelledError")
@@ -210,28 +222,49 @@ async def disconnect(sid):
 async def heartbeat_task(state_update_queue):
     print("Heartbeat task starting")
     state = None
+    sock = None
+    addr = None
+    loop = asyncio.get_event_loop()
     try:
         while True:
-            await asyncio.sleep(2)  # Run every 2 seconds
-            # TODO: go through in no wait and return last state
+            await asyncio.sleep(1)  # Run every 1 second
             new_state = None
-            # TODO: purge the state update queue and apply the state to the
-            # local state copy and send it in the heartbeat
+            # TODO: 
             # count of initiatied calls in list
             # count of completed calls in list
+
+            # empty queue and update state information
+            new_canidate = None
             while True:
                 try:
                     (new_state, canidate) = state_update_queue.get_nowait()
                     # flatten dicts for json conversion
                     new_state.decodes = {str(k): v for k, v in new_state.decodes.items()}
                     new_state.lc_or_oa_decodes = {str(k): v for k, v in new_state.lc_or_oa_decodes.items()}
+                    if new_state.sock:
+                        sock = new_state.sock
+                        new_state.sock = None
+                    if new_state.addr:
+                        addr = new_state.addr
+                        new_state.addr = None
+                    if canidate:
+                        new_canidate = canidate
                 except asyncio.QueueEmpty:
                     break
-            state = new_state
+            if new_state != None:
+                # update the state
+                state = new_state
             if state != None:
                 now = datetime.now()
                 state.time = now.strftime("%Y-%m-%d %H:%M:%S")
+                state.sock = None
+                state.addr = None
+                #print(f"{state}")
                 await sio.emit("gateway_heartbeat", state.__dict__)
+            if new_canidate:
+                print(f"initiating reply to {new_canidate.message}")
+                reply_pkt = pywsjtx.ReplyPacket.Builder(new_canidate["pkt"])
+                await loop.run_in_executor(None, sock.sendto, reply_pkt, addr)
     except asyncio.CancelledError:
         print("Heartbeat task cancelled")
     except Exception as e:
@@ -250,6 +283,20 @@ class StateMachineState():
         self.delta_time_threshold = delta_time_threshold
         self.max_cq_decode_age = max_cq_decode_age
         self.time = None
+        self.sock = None
+        self.addr = None
+
+    def __repr__(self):
+        return f"{{ 'busy' : {self.busy}, 'dial_freq' : {self.dial_freq}, 'mode' : {self.mode},\n\
+                'lc_or_oa_decodes' : {self.lc_or_oa_decodes},\n\
+                'decodes' : {self.decodes},\n\
+                'snr_threshold' : {self.snr_threshold},\n\
+                'delta_time_threshold' : {self.delta_time_threshold},\n\
+                'max_cq_decode_age' : {self.max_cq_decode_age},\n\
+                'time' : {self.time},\n\
+                'sock' : {self.sock},\n\
+                'addr' : {self.addr}}}\n"
+
 
     def to_json(self):
         return json.dumps(self.__dict__)
@@ -266,8 +313,6 @@ async def state_machine_task(state_machine_queue, state_update_queue):
     calls_tried = {}
     calls_73 = {}
     canidate = None
-    # TODO: get current best canidate and add that
-    # get current state (cts, rts, busy) and add that
     try:
         while True:
             data = await state_machine_queue.get()
@@ -293,14 +338,16 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                 # if we need new dictionaries of examined calls, set them up now
                 dict_state = (state.dial_freq, state.mode)
                 if calls_tried.get(dict_state, None) is None:
+                    print(f"init calls tried dictionary for {dict_state}")
                     calls_tried[dict_state] = {}
                 if calls_73.get(dict_state, None) is None:
+                    print(f"init calls 73 dictionary for {dict_state}")
                     calls_73[dict_state] = {}
                 # if we are transmitting then there must be a dx call set so let's
                 # add it to the list of tried calls
                 if data["transmitting"]:
                     calls_tried[dict_state][data["dx_call"]] = True
-                await state_update_queue.put((state, None))
+                await state_update_queue.put((copy.copy(state), None))
             elif data["type"] == StateMachineMessageType.DECODE:
                 #print(f"received decode message: {data}")
                 # skip if replay
@@ -342,6 +389,9 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                             calls_73[dict_state].get(call, False):
                         #print("culled for previous message")
                         continue
+                elif len(tokens) == 2:
+                    # skip missing grid
+                    continue
                 else:
                     # malformed CQ message
                     print(f"{__file__}:{__name__} : malformed CQ message: {data}")
@@ -365,7 +415,7 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                         continue
                 data["last"] = datetime.now()
                 canidate = data.copy()
-                await state_update_queue.put((state, canidate))
+                await state_update_queue.put((copy.copy(state), canidate))
             elif data["type"] == StateMachineMessageType.QSO_LOGGED:
                 # make sure the mode matches
                 if data["mode"] != state.mode:
@@ -378,6 +428,9 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                 calls_tried[dict_state][data.call] = False
                 # add to new dict
                 calls_73[dict_state][data.call] = True
+            elif data["type"] == StateMachineMessageType.SOCKET_INFO:
+                state.sock = data["sock"]
+                state.addr = data["addr"]
             else:
                 print(
                     f"{__file__}:{__name__} : unexpected state machine message: {data}"
