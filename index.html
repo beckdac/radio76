@@ -8,6 +8,7 @@
         .control-group { margin-bottom: 20px; border: 1px solid #ccc; padding: 15px; border-radius: 8px; background: white; position: relative; }
         .status-group { margin-bottom: 20px; border: 1px solid #ccc; padding: 15px; border-radius: 8px; background: white; position: relative; }
 	.status-table { width: 30%; border: 1px solid black; display: inline-table; vertical-align: top; /* Ensures they align at the top */ margin: 0; /* Optional: Removes default margins */ }
+	.qso-logged-table { width: 30%; border: 1px solid black; display: inline-table; vertical-align: top; /* Ensures they align at the top */ margin: 0; /* Optional: Removes default margins */ }
         
         /* LED Styling */
         #led { width: 20px; height: 20px; border-radius: 50%; display: inline-block; vertical-align: middle; margin-left: 15px; border: 2px solid #333; transition: background-color 0.3s; }
@@ -22,6 +23,9 @@
         /* Timer Styling */
         #timerContainer { font-weight: bold; color: #555; margin-bottom: 10px; font-size: 0.9em; }
         #seconds { color: #d9534f; }
+
+	/* QSO Logged Table */
+	.qso-logged-row { color: #0056b3, font-weight: 500 }
 
 	/* Decode Table */
 	.decode-table-row { color: #0056b3, font-weight: 500 }
@@ -92,12 +96,19 @@
     </div>
 
     <div class="control-group">
-        <button id="actionButton" onclick="toggleLed()">Toggle LED Status</button>
-        <div id="led" class="led-off"></div>
+        <strong>QSOs Logged (<span id="qsoLoggedCount">0</span> logged)</strong>
+        <table id="qsoLoggedTable">
+            <thead>
+	    <tr><th>ID</th><th>Time Off</th><th>Call</th><th>Grid</th><th>Freq</th><th>Mode</th><th>Sent</th><th>Recv</th><th>TX Pwr</th><th>Comments</th><th>Name</th><th>Time On</th><th>Op Call</th><th>My Call</th><th>My Grid</th><th>Exchg Sent</th><th>Exchg Recv</th></tr>
+            </thead>
+            <tbody id="qsoLoggedTableBody">
+                <tr><td colspan="17">Waiting for server data...</td></tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="control-group">
-        <strong>WSJTX Decodes</strong>
+	    <strong>WSJTX Decodes (<span id="decodeCount">0</span> received)</strong>
         <table id="decodeTable">
             <thead>
 		    <tr><th>ID</th><th>New</th><th>Time</th><th>SNR</th><th>&Delta; t</th><th>&Delta; Hz</th><th>Mode</th><th>Message</th><th>Low Conf.</th><th>Off Air</th></tr>
@@ -110,7 +121,8 @@
 
     <script>
 	const socket = io('http://localhost:5000', { transports: ['websocket'] });
-        let isLedOn = false;
+        let decodeCount = 0;
+	let qsoLoggedCount = 0;
         let secondsSinceGatewayUpdate = 0;
         let secondsSinceWSJTXUpdate = 0;
 
@@ -136,20 +148,6 @@
         function sendUpdate(type, value) {
             resetWSJTXTimer(); // Reset when user interacts
             socket.emit('update_control', { type, value });
-        }
-
-        function toggleLed() {
-            const led = document.getElementById('led');
-	    isLedOn = led.classList.contains('led-on')
-            isLedOn = !isLedOn;
-            updateLedUI(isLedOn);
-            sendUpdate('led', isLedOn);
-        }
-
-        function updateLedUI(state) {
-            const led = document.getElementById('led');
-	    isLedOn = led.classList.contains('led-on')
-            led.className = state ? 'led-off' : 'led-on';
         }
 
 	socket.on('gateway_heartbeat', (data) => {
@@ -196,8 +194,23 @@
 	    document.getElementById('statusSpecialOpMode').innerText = data.special_op_mode;
 	});
 
+	socket.on('qso_logged', (data) => {
+	    WSJTXLedBlink();
+	    qsoLoggedCount++;
+	    const tbody = document.getElementById('qsoLoggedTableBody');
+	    const tr = document.createElement('tr');
+	    tr.className = 'qso-logged-table-row';
+	    tr.innerHTML = `<td>${data.id}</td><td>${data.datetime_off}</td><td>${data.call}</td><td>${data.grid}</td><td>${data.frequency}</td><td>${data.mode}</td><td>${data.report_sent}</td><td>${data.report_recv}</td><td>${data.tx_power}</td><td>${data.comments}</td><td>${data.name}</td><td>${data.datetime_on}</td><td>${data.op_call}</td><td>${data.my_call}</td><td>${data.my_grid}</td><td>${data.exchange_sent}</td><td>${data.exchange_recv}</td>`;
+	    tbody.prepend(tr);
+	    if (tbody.children.length > 5) {
+		tbody.removeChild(tbody.lastElementChild);
+	    }
+	    document.getElementById('qsoLoggedCount').innerText = qsoLoggedCount;
+	});
+
 	socket.on('decode', (data) => {
 	    WSJTXLedBlink();
+	    decodeCount++;
 	    const tbody = document.getElementById('decodeTableBody');
 	    //tbody.innerHTML = ''; // clear
 	    data.rows.forEach(row => {
@@ -209,21 +222,8 @@
 		    tbody.removeChild(tbody.lastElementChild);
 		}
             });
+	    document.getElementById('decodeCount').innerText = decodeCount;
 	});
-
-        socket.on('control_update', (data) => {
-	    WSJTXLedBlink();
-
-            if (data.type === 'text') {
-                document.getElementById('textInput').value = data.value;
-            } else if (data.type === 'dropdown') {
-                document.getElementById('selectInput').value = data.value;
-            } else if (data.type === 'table') {
-                document.getElementById('tableCell').innerText = data.value;
-            } else if (data.type === 'led') {
-                updateLedUI(data.value);
-            }
-        });
     </script>
 </body>
 </html>
