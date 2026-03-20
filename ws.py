@@ -206,7 +206,7 @@ async def disconnect(sid):
     print(f"Client disconnected: {sid}")
 
 
-async def heartbeat_task(state_update_queue):
+async def heartbeat_task():
     print("Heartbeat task starting")
     data = {}
     try:
@@ -223,6 +223,18 @@ async def heartbeat_task(state_update_queue):
         print("Heartbeat task cancelled")
 
 
+class StateMachineState():
+    def __init__(self, snr_threshold: -10, delta_time_threshold: .5, max_cq_decode_age: 20):
+        self.busy = True
+        self.dial_freq = None
+        self.mode = None
+        self.oc_or_oa_decodes = {}
+        self.decodes = {}
+        self.snr_threshold = snr_threshold
+        self.delta_time_threshold = delta_time_threshold
+        self.max_cq_decode_age = max_cq_decode_age
+
+
 async def state_machine_task(state_machine_queue, state_update_queue):
     """
     Models / manages the state of the system by observing messages
@@ -231,16 +243,7 @@ async def state_machine_task(state_machine_queue, state_update_queue):
     messages and identify canidate best calls.
     """
     print("State machine task starting")
-    state = {
-        "busy": True,
-        "dial_freq": None,
-        "mode": None,
-        "lc_or_oa_decodes": {},
-        "decodes": {},
-        "snr_threshold": -10,
-        "delta_time_threshold": 1.0,
-        "max_cq_decode_age": 20,
-    }
+    state = StateMachineState()
     calls_tried = {}
     calls_73 = {}
     canidate = None
@@ -254,22 +257,22 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                 #print("looking at status message")
                 reset = False
                 if not data["tx_enabled"] and not data["transmitting"]:
-                    state["busy"] = False
+                    state.busy = False
                 else:
-                    state["busy"] = True
-                if state["dial_freq"] != data["dial_freq"]:
+                    state.busy = True
+                if state.dial_freq != data["dial_freq"]:
                     print("frequency change detected")
                     reset = True
-                if state["mode"] != data["mode"]:
+                if state.mode != data["mode"]:
                     print("mode change detected")
                     reset = True
                 if reset:
                     print("resetting for dial or mode change")
                     canidate = None
-                    state["mode"] = data["mode"]
-                    state["dial_freq"] = data["dial_freq"]
+                    state.mode = data["mode"]
+                    state.dial_freq = data["dial_freq"]
                 # if we need new dictionaries of examined calls, set them up now
-                dict_state = (state["dial_freq"], state["mode"])
+                dict_state = (state.dial_freq, state.mode)
                 if calls_tried.get(dict_state, None) is None:
                     calls_tried[dict_state] = {}
                 if calls_73.get(dict_state, None) is None:
@@ -278,22 +281,23 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                 # add it to the list of tried calls
                 if data["transmitting"]:
                     calls_tried[dict_state][data["dx_call"]] = True
+                await state_update_queue.put((state, None))
             elif data["type"] == StateMachineMessageType.DECODE:
                 #print(f"received decode message: {data}")
                 # skip if replay
                 if not data["new"]:
                     continue
                 # increment counters for freq and mode based decodes
-                dict_state = (state["dial_freq"], state["mode"])
-                curr = state["decodes"].get(dict_state, 0)
-                state["decodes"][dict_state] = curr + 1
+                dict_state = (state.dial_freq, state.mode)
+                curr = state.decodes.get(dict_state, 0)
+                state.decodes[dict_state] = curr + 1
                 # skip low confidence or off air
                 if data["low_conf"] or data["off_air"]:
-                    curr = state["lc_or_oa_decodes"].get(dict_state, 0)
-                    state["lc_or_oa_decodes"][dict_state] = curr + 1
+                    curr = state.lc_or_oa_decodes.get(dict_state, 0)
+                    state.lc_or_oa_decodes[dict_state] = curr + 1
                     continue
                 # make sure the mode matches
-                # if data['mode'] != state['mode']:
+                # if data['mode'] != state.mode:
                 #    print(f"{__file__}:{__name__} : mode mismatch between known current state and decode: {data}")
                 #    continue
                 # mode is frequently ~
@@ -321,33 +325,36 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                     print(f"{__file__}:{__name__} : malformed CQ message: {data}")
                     continue
                 # apply snr threshold
-                if data["snr"] < state["snr_threshold"]:
+                if data["snr"] < state.snr_threshold:
                     #print(f"culled for snr: {data['snr']}")
                     continue
                 # apply delta time threshold
-                if abs(float(data["delta_time"])) > abs(state["delta_time_threshold"]):
+                if abs(float(data["delta_time"])) > abs(state.delta_time_threshold):
                     #print(f"culled for delta time: {data['delta_time']}")
                     continue
                 # compare against current canidate
                 if canidate is not None:
                     cdiff = datetime.now() - canidate["last"]
                     if (
-                        cdiff.total_seconds() < state["max_cq_decode_age"]
+                        cdiff.total_seconds() < state.max_cq_decode_age
                         and canidate["snr"] > data["snr"]
                     ):
                         #print("culled for being less than previous valid canidate")
                         continue
                 data["last"] = datetime.now()
                 canidate = data.copy()
-                print(f"new canidate: {canidate}")
+                await state_update_queue.put((state, canidate))
             elif data["type"] == StateMachineMessageType.QSO_LOGGED:
                 # make sure the mode matches
-                if data["mode"] != state["mode"]:
+                if data["mode"] != state.mode:
                     print(
                         f"{__file__}:{__name__} : mode mismatch between known current state and decode: {data}"
                     )
                     continue
-                dict_state = (state["dial_freq"], state["mode"])
+                dict_state = (state.dial_freq, state.mode)
+                # remove from old dict, if there
+                calls_tried[dict_state][data.call] = False
+                # add to new dict
                 calls_73[dict_state][data.call] = True
             else:
                 print(
@@ -370,7 +377,7 @@ async def start_background_tasks(app):
     app["state_machine"] = asyncio.create_task(
         state_machine_task(state_machine_queue, state_update_queue)
     )
-    app["heartbeat"] = asyncio.create_task(heartbeat_task(state_update_queue))
+    app["heartbeat"] = asyncio.create_task(heartbeat_task())
 
 
 async def cleanup_background_tasks(app):
