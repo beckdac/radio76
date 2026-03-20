@@ -8,6 +8,7 @@ canidate next calls and manages a state machine / model.
 import asyncio
 from datetime import datetime
 from enum import Enum
+import json
 import socket
 import struct
 import traceback
@@ -206,34 +207,52 @@ async def disconnect(sid):
     print(f"Client disconnected: {sid}")
 
 
-async def heartbeat_task():
+async def heartbeat_task(state_update_queue):
     print("Heartbeat task starting")
-    data = {}
+    state = None
     try:
         while True:
             await asyncio.sleep(2)  # Run every 2 seconds
-            now = datetime.now()
-            data["time"] = now.strftime("%Y-%m-%d %H:%M:%S")
+            # TODO: go through in no wait and return last state
+            new_state = None
             # TODO: purge the state update queue and apply the state to the
             # local state copy and send it in the heartbeat
             # count of initiatied calls in list
             # count of completed calls in list
-            await sio.emit("gateway_heartbeat", data)
+            while True:
+                try:
+                    (new_state, canidate) = state_update_queue.get_nowait()
+                    # flatten dicts for json conversion
+                    new_state.decodes = {str(k): v for k, v in new_state.decodes.items()}
+                    new_state.lc_or_oa_decodes = {str(k): v for k, v in new_state.lc_or_oa_decodes.items()}
+                except asyncio.QueueEmpty:
+                    break
+            state = new_state
+            if state != None:
+                now = datetime.now()
+                state.time = now.strftime("%Y-%m-%d %H:%M:%S")
+                await sio.emit("gateway_heartbeat", state.__dict__)
     except asyncio.CancelledError:
         print("Heartbeat task cancelled")
+    except Exception as e:
+        print(f"state machine task exception occurred:\n{type(e)} : {e}")
+        traceback.print_exc()
 
 
 class StateMachineState():
-    def __init__(self, snr_threshold: -10, delta_time_threshold: .5, max_cq_decode_age: 20):
+    def __init__(self, snr_threshold=-10, delta_time_threshold=.5, max_cq_decode_age=20):
         self.busy = True
         self.dial_freq = None
         self.mode = None
-        self.oc_or_oa_decodes = {}
+        self.lc_or_oa_decodes = {}
         self.decodes = {}
         self.snr_threshold = snr_threshold
         self.delta_time_threshold = delta_time_threshold
         self.max_cq_decode_age = max_cq_decode_age
+        self.time = None
 
+    def to_json(self):
+        return json.dumps(self.__dict__)
 
 async def state_machine_task(state_machine_queue, state_update_queue):
     """
@@ -295,6 +314,9 @@ async def state_machine_task(state_machine_queue, state_update_queue):
                 if data["low_conf"] or data["off_air"]:
                     curr = state.lc_or_oa_decodes.get(dict_state, 0)
                     state.lc_or_oa_decodes[dict_state] = curr + 1
+                    continue
+                # if the system is still getting state skip
+                if state.mode is None or state.dial_freq is None:
                     continue
                 # make sure the mode matches
                 # if data['mode'] != state.mode:
@@ -377,7 +399,7 @@ async def start_background_tasks(app):
     app["state_machine"] = asyncio.create_task(
         state_machine_task(state_machine_queue, state_update_queue)
     )
-    app["heartbeat"] = asyncio.create_task(heartbeat_task())
+    app["heartbeat"] = asyncio.create_task(heartbeat_task(state_update_queue))
 
 
 async def cleanup_background_tasks(app):
