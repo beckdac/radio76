@@ -262,7 +262,7 @@ async def heartbeat_task(state_update_queue):
                 #print(f"{state}")
                 await sio.emit("gateway_heartbeat", state.__dict__)
             if new_canidate:
-                print(f"initiating reply to {new_canidate.message}")
+                print(f"initiating reply to {new_canidate["message]"}")
                 reply_pkt = pywsjtx.ReplyPacket.Builder(new_canidate["pkt"])
                 await loop.run_in_executor(None, sock.sendto, reply_pkt, addr)
     except asyncio.CancelledError:
