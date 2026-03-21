@@ -254,17 +254,17 @@ async def heartbeat_task(state_update_queue):
             if new_state != None:
                 # update the state
                 state = new_state
-            if state != None:
+            if state != None and sock != None and addr != None:
                 now = datetime.now()
                 state.time = now.strftime("%Y-%m-%d %H:%M:%S")
                 state.sock = None
                 state.addr = None
                 #print(f"{state}")
                 await sio.emit("gateway_heartbeat", state.__dict__)
-            if not state.busy and new_canidate:
-                print(f"initiating reply to {new_canidate['message']}")
-                reply_pkt = pywsjtx.ReplyPacket.Builder(new_canidate["pkt"])
-                await loop.run_in_executor(None, sock.sendto, reply_pkt, addr)
+                if not state.busy and new_canidate:
+                    print(f"initiating reply to {new_canidate['message']}")
+                    reply_pkt = pywsjtx.ReplyPacket.Builder(new_canidate["pkt"])
+                    await loop.run_in_executor(None, sock.sendto, reply_pkt, addr)
     except asyncio.CancelledError:
         print("Heartbeat task cancelled")
     except Exception as e:
